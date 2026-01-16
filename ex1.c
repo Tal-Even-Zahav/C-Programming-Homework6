@@ -113,115 +113,89 @@ char* read_and_clean_file(FILE *fp) {
     return cleaned;
 }
 
-// Find a label in text, ignoring whitespace/newlines within the label itself
-// Returns pointer to position after the label, or NULL if not found
-const char* find_label(const char *text, const char *label) {
-    for (const char *start = text; *start != '\0'; start++) {
-        const char *t = start;
-        const char *l = label;
+// Find a pattern in text, ignoring whitespace within the pattern
+// Returns pointer to start of match in text
+const char* find_label(const char *text, const char *pattern) {
+    const char *t = text;
+    
+    while (*t != '\0') {
+        const char *t_check = t;
+        const char *p = pattern;
+        int matched = 1;
         
-        while (*l != '\0') {
-            // Skip whitespace in BOTH text and label
-            while (*t == ' ' || *t == '\t' || *t == '\n' || *t == '\r') {
-                t++;
-            }
-            while (*l == ' ' || *l == '\t' || *l == '\n' || *l == '\r') {
-                l++;
+        // Try to match pattern from this position
+        while (*p != '\0') {
+            // Skip whitespace in text
+            while (*t_check != '\0' && (*t_check == ' ' || *t_check == '\t' || 
+                   *t_check == '\n' || *t_check == '\r')) {
+                t_check++;
             }
             
-            // Check if we've reached end of label
-            if (*l == '\0') break;
-            
-            // Compare characters
-            if (*t == *l) {
-                t++;
-                l++;
-            } else {
+            if (*t_check != *p) {
+                matched = 0;
                 break;
             }
+            
+            t_check++;
+            p++;
         }
         
-        // Did we match entire label?
-        if (*l == '\0') {
-            // Skip trailing whitespace in text
-            while (*t == ' ' || *t == '\t' || *t == '\n' || *t == '\r') {
-                t++;
-            }
+        if (matched) {
             return t;
         }
+        
+        t++;
     }
     
     return NULL;
 }
 
+// Skip past a label (including any whitespace within it)
+const char* skip_label(const char *text, const char *pattern) {
+    const char *t = text;
+    const char *p = pattern;
+    
+    while (*p != '\0') {
+        // Skip whitespace in text
+        while (*t != '\0' && (*t == ' ' || *t == '\t' || *t == '\n' || *t == '\r')) {
+            t++;
+        }
+        
+        if (*t != *p) {
+            return text; // Shouldn't happen if find_label was called first
+        }
+        
+        t++;
+        p++;
+    }
+    
+    return t;
+}
+
 // Extract value between current position and next label
-// Strips leading/trailing whitespace but preserves internal structure
-char* extract_value_until_label(const char *start, const char *label_to_find) {
-    // We need to find where the label starts in the text
-    // Search character by character and try to match the label
-    const char *value_end = start;
-    
-    while (*value_end != '\0') {
-        // Try to match label from this position
-        const char *t = value_end;
-        const char *l = label_to_find;
-        int match = 1;
-        
-        while (*l != '\0') {
-            // Skip whitespace in both text and label
-            while (*t == ' ' || *t == '\t' || *t == '\n' || *t == '\r') {
-                t++;
-            }
-            while (*l == ' ' || *l == '\t' || *l == '\n' || *l == '\r') {
-                l++;
-            }
-            
-            if (*l == '\0') break;
-            
-            if (*t == *l) {
-                t++;
-                l++;
-            } else {
-                match = 0;
-                break;
-            }
-        }
-        
-        // Did we find the label?
-        if (match && *l == '\0') {
-            // value_end now points to start of label
-            break;
-        }
-        
-        value_end++;
-    }
-    
-    // Now extract from start to value_end
-    const char *value_start = start;
-    
+// Removes newlines, keeps spaces
+char* extract_value_to_label(const char *start, const char *end) {
     // Skip leading whitespace
-    while (value_start < value_end && (*value_start == ' ' || *value_start == '\t' || 
-           *value_start == '\n' || *value_start == '\r')) {
-        value_start++;
+    while (start < end && (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r')) {
+        start++;
     }
     
-    // Skip trailing whitespace (work backwards from value_end)
-    const char *actual_end = value_end;
-    while (actual_end > value_start && (*(actual_end - 1) == ' ' || *(actual_end - 1) == '\t' || 
-           *(actual_end - 1) == '\n' || *(actual_end - 1) == '\r')) {
-        actual_end--;
+    // Skip trailing whitespace
+    while (end > start && (*(end - 1) == ' ' || *(end - 1) == '\t' || 
+           *(end - 1) == '\n' || *(end - 1) == '\r')) {
+        end--;
     }
     
-    if (actual_end <= value_start) {
+    if (end <= start) {
         char *result = (char *)malloc(1);
         if (result) result[0] = '\0';
         return result;
     }
     
-    // Calculate length (excluding internal newlines/tabs)
+    // Count characters (excluding newlines)
     int len = 0;
-    for (const char *p = value_start; p < actual_end; p++) {
-        if (*p != '\n' && *p != '\r' && *p != '\t') {
+    for (const char *p = start; p < end; p++) {
+        if (*p != '\n' && *p != '\r') {
             len++;
         }
     }
@@ -232,10 +206,10 @@ char* extract_value_until_label(const char *start, const char *label_to_find) {
         return NULL;
     }
     
-    // Copy value, removing newlines/tabs but keeping spaces
+    // Copy, skipping newlines
     int j = 0;
-    for (const char *p = value_start; p < actual_end; p++) {
-        if (*p != '\n' && *p != '\r' && *p != '\t') {
+    for (const char *p = start; p < end; p++) {
+        if (*p != '\n' && *p != '\r') {
             result[j++] = *p;
         }
     }
@@ -259,113 +233,79 @@ Entry* parse_entries(const char *text, int *entry_count) {
     const char *ptr = text;
     
     while (*ptr != '\0') {
-        // Find "First Name:"
-        const char *after_first_label = find_label(ptr, "First Name:");
-        if (after_first_label == NULL) break;
+        // Look for "FirstName:" (ignoring whitespace)
+        const char *first_name_start = find_label(ptr, "FirstName:");
+        if (first_name_start == NULL) break;
         
-        // Extract first name (until "Second Name:")
-        char *first_name = extract_value_until_label(after_first_label, "Second Name:");
-        if (first_name == NULL) break;
+        // Skip past the label
+        ptr = skip_label(first_name_start, "FirstName:");
         
-        // Find "Second Name:"
-        const char *after_second_label = find_label(after_first_label, "Second Name:");
-        if (after_second_label == NULL) {
-            free(first_name);
-            break;
+        // Find "SecondName:"
+        const char *second_name_start = find_label(ptr, "SecondName:");
+        if (second_name_start == NULL) break;
+        
+        // Extract first name
+        char *first_name = extract_value_to_label(ptr, second_name_start);
+        if (first_name == NULL) {
+            free_entries(entries, *entry_count);
+            return NULL;
         }
         
-        // Extract second name (until "Fingerprint:")
-        char *second_name = extract_value_until_label(after_second_label, "Fingerprint:");
-        if (second_name == NULL) {
-            free(first_name);
-            break;
-        }
+        // Skip past "SecondName:"
+        ptr = skip_label(second_name_start, "SecondName:");
         
         // Find "Fingerprint:"
-        const char *after_fingerprint_label = find_label(after_second_label, "Fingerprint:");
-        if (after_fingerprint_label == NULL) {
+        const char *fingerprint_start = find_label(ptr, "Fingerprint:");
+        if (fingerprint_start == NULL) {
             free(first_name);
-            free(second_name);
             break;
         }
+        
+        // Extract second name
+        char *second_name = extract_value_to_label(ptr, fingerprint_start);
+        if (second_name == NULL) {
+            free(first_name);
+            free_entries(entries, *entry_count);
+            return NULL;
+        }
+        
+        // Skip past "Fingerprint:"
+        ptr = skip_label(fingerprint_start, "Fingerprint:");
+        
+        // Skip whitespace before fingerprint
+        while (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r') ptr++;
         
         // Extract fingerprint (exactly 9 alphanumeric characters)
         char fingerprint[FINGERPRINT_LEN + 1];
         int fp_len = 0;
-        const char *fp_ptr = after_fingerprint_label;
-        while (fp_len < FINGERPRINT_LEN && *fp_ptr != '\0') {
-            if (isalnum(*fp_ptr)) {
-                fingerprint[fp_len++] = *fp_ptr;
-            } else if (*fp_ptr != ' ' && *fp_ptr != '\t' && *fp_ptr != '\n' && *fp_ptr != '\r') {
-                // Hit a non-alphanumeric, non-whitespace character
-                break;
-            }
-            fp_ptr++;
+        while (fp_len < FINGERPRINT_LEN && isalnum(*ptr)) {
+            fingerprint[fp_len++] = *ptr++;
         }
         fingerprint[fp_len] = '\0';
         
         if (fp_len != FINGERPRINT_LEN) {
             free(first_name);
             free(second_name);
-            // Move ptr forward to try next entry
-            ptr = after_first_label;
             continue;
         }
         
         // Find "Position:"
-        const char *after_position_label = find_label(fp_ptr, "Position:");
-        if (after_position_label == NULL) {
+        const char *position_start = find_label(ptr, "Position:");
+        if (position_start == NULL) {
             free(first_name);
             free(second_name);
             break;
         }
         
-        // Extract position (until next "First Name:" or end of string)
-        char *position;
-        const char *next_entry_label = find_label(after_position_label, "First Name:");
-        if (next_entry_label != NULL) {
-            position = extract_value_until_label(after_position_label, "First Name:");
-        } else {
-            // Last entry - extract until end
-            const char *pos_start = after_position_label;
-            const char *pos_end = pos_start + strlen(pos_start);
-            
-            // Skip leading whitespace
-            while (pos_start < pos_end && (*pos_start == ' ' || *pos_start == '\t' || 
-                   *pos_start == '\n' || *pos_start == '\r')) {
-                pos_start++;
-            }
-            
-            // Skip trailing whitespace
-            while (pos_end > pos_start && (*(pos_end - 1) == ' ' || *(pos_end - 1) == '\t' || 
-                   *(pos_end - 1) == '\n' || *(pos_end - 1) == '\r')) {
-                pos_end--;
-            }
-            
-            int len = 0;
-            for (const char *p = pos_start; p < pos_end; p++) {
-                if (*p != '\n' && *p != '\r' && *p != '\t') {
-                    len++;
-                }
-            }
-            
-            position = (char *)malloc(len + 1);
-            if (position == NULL) {
-                free(first_name);
-                free(second_name);
-                free_entries(entries, *entry_count);
-                return NULL;
-            }
-            
-            int j = 0;
-            for (const char *p = pos_start; p < pos_end; p++) {
-                if (*p != '\n' && *p != '\r' && *p != '\t') {
-                    position[j++] = *p;
-                }
-            }
-            position[j] = '\0';
-        }
+        // Skip past "Position:"
+        ptr = skip_label(position_start, "Position:");
         
+        // Find next "FirstName:" or end of string
+        const char *next_entry = find_label(ptr, "FirstName:");
+        const char *position_end = next_entry ? next_entry : (ptr + strlen(ptr));
+        
+        // Extract position
+        char *position = extract_value_to_label(ptr, position_end);
         if (position == NULL) {
             free(first_name);
             free(second_name);
@@ -405,8 +345,12 @@ Entry* parse_entries(const char *text, int *entry_count) {
             free(position);
         }
         
-        // Move pointer forward to continue searching
-        ptr = after_first_label;
+        // Move to next entry
+        if (next_entry) {
+            ptr = next_entry;
+        } else {
+            break;
+        }
     }
     
     return entries;
