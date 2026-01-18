@@ -1,19 +1,16 @@
 #include "fixed_point.h"
 #include <stdio.h>
 
+#define SHIFT 1000000.0
+
 void print_fixed(int16_t raw, int16_t q) {
 
-    double x = 0;
-    int denominator = 1;
+    double x = (double)raw / (1 << q);
 
-    for (int i = 0; i < q; i++)
-    {
-        denominator *= 2;
-    }
+    int64_t truncate = (int64_t)(x * SHIFT);
+    double res = (double)(truncate / SHIFT);
 
-    x = (double)raw / (double)denominator;
-
-    printf("%.6f",x);
+    printf("%.6f", res);
 }
 
 int16_t add_fixed(int16_t a, int16_t b) {
@@ -28,24 +25,18 @@ int16_t multiply_fixed(int16_t a, int16_t b, int16_t q) {
     // TODO: Implement fixed-point multiply:
        //- Use a wider type for intermediate multiplication (e.g., int32_t or int64_t).
 
-    long double raw_out = 0;
+    int16_t raw_out = 0;
 
-    int denominator = 1;
+    raw_out = (int16_t)(((int32_t)(a*b))/(1 << q));
 
-    for (int i = 0; i < q; i++)
-    {
-        denominator *= 2;
-    }
-
-    raw_out = ((int64_t)(a*b))/denominator;
-       
-   
+    return raw_out;
 }
 
 void eval_poly_ax2_minus_bx_plus_c_fixed(int16_t x, int16_t a, int16_t b, int16_t c, int16_t q) {
     /* TODO:
        Evaluate: y = a*x^2 - b*x + c
     */
+   
 
     printf("the polynomial output for a=");
     print_fixed(a, q);
@@ -63,8 +54,10 @@ void eval_poly_ax2_minus_bx_plus_c_fixed(int16_t x, int16_t a, int16_t b, int16_
 
 }
 
+/*
 int main()
 {
     eval_poly_ax2_minus_bx_plus_c_fixed(200,1002,1200,9012,12);
     return 0;
 }
+*/
