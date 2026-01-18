@@ -118,7 +118,6 @@ Org build_org_from_clean_file(const char *path) {
     // Open file
     FILE* clean_file = fopen(path, "r");
     if (clean_file == NULL) {
-        printf("Error opening file: %s\n", path);
         return tree;
     }
     
