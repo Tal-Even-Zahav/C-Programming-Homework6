@@ -7,10 +7,10 @@ void print_fixed(int16_t raw, int16_t q) {
 
     double x = (double)raw / (1 << q);
 
-    int64_t truncate = (int64_t)(x * SHIFT);
-    double res = (double)(truncate / SHIFT);
+    int64_t truncate = (int64_t)x * SHIFT;
+    double res = (double)truncate / SHIFT;
 
-    printf("%.6f", res);
+    printf("%.6f\n", res);
 }
 
 int16_t add_fixed(int16_t a, int16_t b) {
