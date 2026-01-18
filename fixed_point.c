@@ -7,10 +7,10 @@ void print_fixed(int16_t raw, int16_t q) {
 
     double x = (double)raw / (1 << q);
 
-    int64_t truncate = (int64_t)x * SHIFT;
-    double res = (double)truncate / SHIFT;
+    int64_t truncate = (int64_t)(x * SHIFT);
+    double res = (double)(truncate / SHIFT);
 
-    printf("%.6f\n", res);
+    printf("%.6f", res);
 }
 
 int16_t add_fixed(int16_t a, int16_t b) {
@@ -51,7 +51,7 @@ void eval_poly_ax2_minus_bx_plus_c_fixed(int16_t x, int16_t a, int16_t b, int16_
     y = add_fixed(multiply_fixed(a,multiply_fixed(x,x,q),q),subtract_fixed(c, multiply_fixed(b,x,q)));
     
     print_fixed(y, q);
-
+    printf("\n");
 }
 
 /*
