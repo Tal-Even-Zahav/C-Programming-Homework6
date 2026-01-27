@@ -69,9 +69,6 @@ static Node* parse_node(char **ptr) {
     }
     node->position[i] = '\0';
     
-    // Update pointer to continue parsing
-    *ptr = field;
-    
     return node;
 }
 

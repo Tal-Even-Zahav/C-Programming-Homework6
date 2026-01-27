@@ -25,9 +25,8 @@ int16_t multiply_fixed(int16_t a, int16_t b, int16_t q) {
     // TODO: Implement fixed-point multiply:
        //- Use a wider type for intermediate multiplication (e.g., int32_t or int64_t).
 
-    int16_t raw_out = 0;
-
-    raw_out = (int16_t)(((int32_t)(a*b))/(1 << q));
+    int64_t raw_temp = (int64_t)a * (int64_t)b;
+    int16_t raw_out = (int16_t)(raw_temp >> 8);
 
     return raw_out;
 }
@@ -48,7 +47,8 @@ void eval_poly_ax2_minus_bx_plus_c_fixed(int16_t x, int16_t a, int16_t b, int16_
     /* TODO: print y once computed */
 
     long double y = 0;
-    y = add_fixed(multiply_fixed(a,multiply_fixed(x,x,q),q),subtract_fixed(c, multiply_fixed(b,x,q)));
+    y = add_fixed(multiply_fixed(a, multiply_fixed(x, x, q), q),
+                  subtract_fixed(c, multiply_fixed(b, x, q)));
     
     print_fixed(y, q);
     printf("\n");
