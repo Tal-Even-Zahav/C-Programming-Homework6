@@ -4,21 +4,10 @@
 #include <ctype.h>
 #include "org_tree.h"
 
-// Helper function to safely copy string with bounds checking
-static void safe_copy(char *dest, const char *src, int max_len) {
-    int i = 0;
-    while (src[i] != '\0' && src[i] != '\n' && i < max_len - 1) {
-        dest[i] = src[i];
-        i++;
-    }
-    dest[i] = '\0';
-}
-
 // Helper function to parse a single node from text starting at ptr
 static Node* parse_node(char **ptr) {
     Node *node = (Node*)malloc(sizeof(Node));
     if (node == NULL) {
-        printf("Memory allocation failed\n");
         return NULL;
     }
     
@@ -35,7 +24,11 @@ static Node* parse_node(char **ptr) {
         return NULL;
     }
     field += strlen("First Name: ");
-    safe_copy(node->first, field, MAX_FIELD);
+    int i = 0;
+    while (*field != '\n' && *field != '\0' && i < MAX_FIELD - 1) {
+        node->first[i++] = *field++;
+    }
+    node->first[i] = '\0';
     
     // Find and extract Second Name
     field = strstr(field, "Second Name: ");
@@ -44,7 +37,11 @@ static Node* parse_node(char **ptr) {
         return NULL;
     }
     field += strlen("Second Name: ");
-    safe_copy(node->second, field, MAX_FIELD);
+    i = 0;
+    while (*field != '\n' && *field != '\0' && i < MAX_FIELD - 1) {
+        node->second[i++] = *field++;
+    }
+    node->second[i] = '\0';
     
     // Find and extract Fingerprint
     field = strstr(field, "Fingerprint: ");
@@ -53,7 +50,11 @@ static Node* parse_node(char **ptr) {
         return NULL;
     }
     field += strlen("Fingerprint: ");
-    safe_copy(node->fingerprint, field, MAX_FIELD);
+    i = 0;
+    while (*field != '\n' && *field != '\0' && i < MAX_FIELD - 1) {
+        node->fingerprint[i++] = *field++;
+    }
+    node->fingerprint[i] = '\0';
     
     // Find and extract Position
     field = strstr(field, "Position: ");
@@ -62,15 +63,20 @@ static Node* parse_node(char **ptr) {
         return NULL;
     }
     field += strlen("Position: ");
-    safe_copy(node->position, field, MAX_POS);
+    i = 0;
+    while (*field != '\n' && *field != '\0' && i < MAX_POS - 1) {
+        node->position[i++] = *field++;
+    }
+    node->position[i] = '\0';
+    
+    // Update pointer to continue parsing
+    *ptr = field;
     
     return node;
 }
 
 // Helper function to append a node to the end of a linked list
 static void append_to_list(Node **head, Node *new_node) {
-    new_node->next = NULL;  // Ensure next is NULL
-    
     if (*head == NULL) {
         *head = new_node;
     } else {
@@ -128,16 +134,9 @@ Org build_org_from_clean_file(const char *path) {
         return tree;
     }
     
-    size_t bytes_read = fread(org_text, 1, file_size, clean_file);
-    fclose(clean_file);
-    
-    if (bytes_read != (size_t)file_size) {
-        printf("Error reading file\n");
-        free(org_text);
-        return tree;
-    }
-    
+    fread(org_text, 1, file_size, clean_file);
     org_text[file_size] = '\0';
+    fclose(clean_file);
     
     // Parse all nodes from the file
     char *ptr = org_text;
@@ -149,53 +148,29 @@ Org build_org_from_clean_file(const char *path) {
         ptr = next_entry;
         Node *node = parse_node(&ptr);
         
-        if (node == NULL) {
-            // Skip to next line and continue
-            while (*ptr != '\0' && *ptr != '\n') ptr++;
-            if (*ptr == '\n') ptr++;
-            continue;
-        }
+        if (node == NULL) continue;
         
         // Assign node to appropriate position in tree
         if (strcmp(node->position, "Boss") == 0) {
-            if (tree.boss == NULL) {  // Only set if not already set
-                tree.boss = node;
-            } else {
-                free(node);  // Duplicate boss, free it
-            }
+            tree.boss = node;
         } else if (strcmp(node->position, "Right Hand") == 0) {
-            if (tree.right_hand == NULL) {  // Only set if not already set
-                tree.right_hand = node;
-                if (tree.boss != NULL) {
-                    tree.boss->right = node;
-                }
-            } else {
-                free(node);  // Duplicate right hand, free it
+            tree.right_hand = node;
+            if (tree.boss != NULL) {
+                tree.boss->right = node;
             }
         } else if (strcmp(node->position, "Left Hand") == 0) {
-            if (tree.left_hand == NULL) {  // Only set if not already set
-                tree.left_hand = node;
-                if (tree.boss != NULL) {
-                    tree.boss->left = node;
-                }
-            } else {
-                free(node);  // Duplicate left hand, free it
+            tree.left_hand = node;
+            if (tree.boss != NULL) {
+                tree.boss->left = node;
             }
-        } else if (strcmp(node->position, "Support Right") == 0) {
+        } else if (strcmp(node->position, "Support_Right") == 0) {
             if (tree.right_hand != NULL) {
                 append_to_list(&(tree.right_hand->supports_head), node);
-            } else {
-                free(node);  // No right hand to attach to
             }
-        } else if (strcmp(node->position, "Support Left") == 0) {
+        } else if (strcmp(node->position, "Support_Left") == 0) {
             if (tree.left_hand != NULL) {
                 append_to_list(&(tree.left_hand->supports_head), node);
-            } else {
-                free(node);  // No left hand to attach to
             }
-        } else {
-            // Unknown position
-            free(node);
         }
     }
     
@@ -243,19 +218,16 @@ void free_org(Org *org) {
     if (org->left_hand != NULL) {
         free_list(org->left_hand->supports_head);
         free(org->left_hand);
-        org->left_hand = NULL;
     }
     
     // Free Right Hand and its supports
     if (org->right_hand != NULL) {
         free_list(org->right_hand->supports_head);
         free(org->right_hand);
-        org->right_hand = NULL;
     }
     
     // Free Boss
     if (org->boss != NULL) {
         free(org->boss);
-        org->boss = NULL;
     }
 }

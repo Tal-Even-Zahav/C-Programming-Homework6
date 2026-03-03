@@ -4,7 +4,6 @@
 #include <ctype.h>
 
 #define FINGERPRINT_LEN 9
-#define INITIAL_CAPACITY 10
 
 // Position hierarchy for sorting
 typedef enum {
@@ -25,6 +24,8 @@ typedef struct {
     PositionType pos_type;
     int original_order;
 } Entry;
+
+//TODO create functions that you can use to clean up the file
 
 // Remove corruption characters from a character
 int is_corruption(char c) {
@@ -90,12 +91,7 @@ char* read_and_clean_file(FILE *fp) {
         return NULL;
     }
     
-    size_t bytes_read = fread(buffer, 1, file_size, fp);
-    if (bytes_read != (size_t)file_size) {
-        printf("Error reading file\n");
-        free(buffer);
-        return NULL;
-    }
+    fread(buffer, 1, file_size, fp);
     buffer[file_size] = '\0';
     
     char *cleaned = (char *)malloc(file_size + 1);
@@ -192,11 +188,7 @@ char* extract_value_to_label(const char *start, const char *end) {
     
     if (end <= start) {
         char *result = (char *)malloc(1);
-        if (result == NULL) {
-            printf("Memory allocation failed\n");
-            return NULL;
-        }
-        result[0] = '\0';
+        if (result) result[0] = '\0';
         return result;
     }
     
@@ -229,7 +221,7 @@ char* extract_value_to_label(const char *start, const char *end) {
 // Parse entries from cleaned text
 Entry* parse_entries(const char *text, int *entry_count) {
     *entry_count = 0;
-    int capacity = INITIAL_CAPACITY;
+    int capacity = 10;
     int order_counter = 0;
     
     Entry *entries = (Entry *)malloc(capacity * sizeof(Entry));
@@ -241,14 +233,14 @@ Entry* parse_entries(const char *text, int *entry_count) {
     const char *ptr = text;
     
     while (*ptr != '\0') {
-        // Look for "First Name:" (ignoring whitespace)
+        // Look for "FirstName:" (ignoring whitespace)
         const char *first_name_start = find_label(ptr, "FirstName:");
         if (first_name_start == NULL) break;
         
         // Skip past the label
         ptr = skip_label(first_name_start, "FirstName:");
         
-        // Find "Second Name:"
+        // Find "SecondName:"
         const char *second_name_start = find_label(ptr, "SecondName:");
         if (second_name_start == NULL) break;
         
@@ -259,7 +251,7 @@ Entry* parse_entries(const char *text, int *entry_count) {
             return NULL;
         }
         
-        // Skip past "Second Name:"
+        // Skip past "SecondName:"
         ptr = skip_label(second_name_start, "SecondName:");
         
         // Find "Fingerprint:"
@@ -308,7 +300,7 @@ Entry* parse_entries(const char *text, int *entry_count) {
         // Skip past "Position:"
         ptr = skip_label(position_start, "Position:");
         
-        // Find next "First Name:" or end of string
+        // Find next "FirstName:" or end of string
         const char *next_entry = find_label(ptr, "FirstName:");
         const char *position_end = next_entry ? next_entry : (ptr + strlen(ptr));
         
@@ -380,8 +372,9 @@ int main(int argc, char **argv) {
         printf("Usage: %s <input_corrupted.txt> <output_clean.txt>\n", argv[0]);
         return 0;
     }
+    // TODO: implement
     
-    FILE *corrupted_text = fopen(argv[1], "rb");
+    FILE *corrupted_text = fopen(argv[1], "r");
     if (corrupted_text == NULL) {
         printf("Error opening file: %s\n", argv[1]);
         return 0;
@@ -405,7 +398,7 @@ int main(int argc, char **argv) {
     
     qsort(entries, entry_count, sizeof(Entry), compare_entries);
     
-    FILE *clean_text = fopen(argv[2], "wb");
+    FILE *clean_text = fopen(argv[2], "w");
     if (clean_text == NULL) {
         printf("Error opening file: %s\n", argv[2]);
         free_entries(entries, entry_count);
