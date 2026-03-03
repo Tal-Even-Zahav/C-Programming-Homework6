@@ -8,7 +8,7 @@ void print_fixed(int16_t raw, int16_t q) {
     double x = (double)raw / (1 << q);
 
     int64_t truncate = (int64_t)(x * SHIFT);
-    double res = (double)(truncate / SHIFT);
+    double res = (double)truncate / SHIFT;  // CORRECT - cast first, then divide
 
     printf("%.6f", res);
 }
@@ -27,7 +27,7 @@ int16_t multiply_fixed(int16_t a, int16_t b, int16_t q) {
 
     int16_t raw_out = 0;
 
-    raw_out = (int16_t)(((int32_t)(a*b))/(1 << q));
+    raw_out = (int16_t)(((int32_t)(a*b)) >> q);  // ✓ CORRECT - using right-shift
 
     return raw_out;
 }
